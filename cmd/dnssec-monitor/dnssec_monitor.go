@@ -1,4 +1,4 @@
-// Binary dnssec_monitor monitors a domain with Verisign Labs DNSSEC analyzer.
+// Binary dnssec_monitor monitors domains with Verisign Labs DNSSEC analyzer.
 package main
 
 import (

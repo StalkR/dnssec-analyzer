@@ -1,0 +1,14 @@
+Source: dnssec-monitor
+Section: utils
+Priority: extra
+Maintainer: StalkR <stalkr@stalkr.net>
+Build-Depends: debhelper (>= 8.0.0)
+Standards-Version: 3.9.3
+Homepage: https://github.com/StalkR/dnssec-analyzer/tree/master/cmd/dnssec-monitor
+
+Package: dnssec-monitor
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}
+Description: DNSSEC monitor
+ Monitor DNSSEC on domains with Verisign Labs DNSSEC analyzer.
+ See https://dnssec-analyzer.verisignlabs.com/.

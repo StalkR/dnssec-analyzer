@@ -1,0 +1,6 @@
+# Arguments:
+#  -domains <domain>,...    required
+#  -from    <email>         required
+#  -to      <email>         required
+#  -every   <duration>      optional, default 24h
+DAEMON_ARGS=""

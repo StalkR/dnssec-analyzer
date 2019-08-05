@@ -14,7 +14,7 @@ import (
 )
 
 var (
-	flagDomain   = flag.String("domain", "", "Domain name to check.")
+	flagDomains  = flag.String("domains", "", "Domain names to check (comma-separated list).")
 	flagDuration = flag.Duration("every", 24*time.Hour, "Check every duration.")
 	flagFrom     = flag.String("from", "", "Email sender.")
 	flagTo       = flag.String("to", "", "Email recipient.")
@@ -22,22 +22,29 @@ var (
 
 func main() {
 	flag.Parse()
-	if *flagDomain == "" || *flagFrom == "" || *flagTo == "" {
+	domains := strings.Split(*flagDomains, ",")
+	if len(domains) == 0 || *flagFrom == "" || *flagTo == "" {
 		flag.PrintDefaults()
 		os.Exit(1)
 	}
+	for _, domain := range domains {
+		monitor(domain)
+	}
+}
+
+func monitor(domain string) {
 	var state dnssec.Status
 	var warnings int
 	for ; ; time.Sleep(*flagDuration) {
 		var result dnssec.Status
 		var details string
-		analysis, err := dnssec.Analyze(*flagDomain)
+		analysis, err := dnssec.Analyze(domain)
 		if err != nil {
-			log.Printf("[Analyze (%s)] Error: %v", state, err)
+			log.Printf("[%v] (state %v) error: %v", domain, state, err)
 			result = dnssec.WARNING
 			details = err.Error()
 		} else {
-			log.Printf("[Analyze (%s)] Status: %s", state, analysis.Status())
+			log.Printf("[%v] (state %v) status: %v", domain, state, analysis.Status())
 			result = analysis.Status()
 			details = analysis.String()
 		}
@@ -87,17 +94,17 @@ func main() {
 			continue
 		}
 		if state == dnssec.ERROR || newState == dnssec.ERROR {
-			log.Printf("[Analyze (%s)] New state: %s", state, newState)
-			if err := email(newState.String(), details); err != nil {
-				log.Print(err)
+			log.Printf("[%v] (state %v) new state: %v", domain, state, newState)
+			if err := email(domain, newState.String(), details); err != nil {
+				log.Printf("[%v] email error: %v", domain, err)
 			}
 		}
 		state = newState
 	}
 }
 
-func email(state, body string) error {
-	subject := fmt.Sprintf("DNSSEC monitor: %s [%s]", *flagDomain, state)
+func email(domain, state, body string) error {
+	subject := fmt.Sprintf("DNSSEC monitor for %v: %v", domain, state)
 	return mail(*flagFrom, *flagTo, subject, body)
 }
 
@@ -107,7 +114,7 @@ func mail(from, to, subject, body string) error {
 	cmd.Stdin = strings.NewReader(msg)
 	out, err := cmd.CombinedOutput()
 	if err != nil {
-		return fmt.Errorf("mail error: %v; out: %q", err, out)
+		return fmt.Errorf("err: %v; out: %q", err, out)
 	}
 	return nil
 }

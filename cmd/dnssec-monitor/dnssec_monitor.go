@@ -33,74 +33,80 @@ func main() {
 }
 
 func monitor(domain string) {
-	var state dnssec.Status
-	var warnings int
+	s := &monitorState{current: dnssec.OK}
 	for ; ; time.Sleep(*flagDuration) {
+		before := s.State()
 		var result dnssec.Status
 		var details string
 		analysis, err := dnssec.Analyze(domain)
 		if err != nil {
-			log.Printf("[%v] (state %v) error: %v", domain, state, err)
+			log.Printf("[%v] (state %v) error: %v", domain, before, err)
 			result = dnssec.WARNING
 			details = err.Error()
 		} else {
-			log.Printf("[%v] (state %v) status: %v", domain, state, analysis.Status())
+			log.Printf("[%v] (state %v) status: %v", domain, before, analysis.Status())
 			result = analysis.Status()
 			details = analysis.String()
 		}
 
-		/*
-			State machine:   +----> OK <--+
-			                 |            |
-			                 v            v
-			             WARNING ------> ERROR
-			- 3 consecutive warnings, we transition to ERROR.
-			- transitions in or out of error state generates an alert
-		*/
-		var newState dnssec.Status
-		switch state {
-		case dnssec.OK:
-			switch result {
-			case dnssec.WARNING:
-				newState = dnssec.WARNING
-			case dnssec.ERROR:
-				newState = dnssec.ERROR
-			}
-
-		case dnssec.WARNING:
-			switch result {
-			case dnssec.OK:
-				newState = dnssec.OK
-				warnings = 0
-			case dnssec.WARNING:
-				warnings++
-				if warnings > 3 {
-					newState = dnssec.ERROR
-					warnings = 0
-				}
-			case dnssec.ERROR:
-				newState = dnssec.ERROR
-				warnings = 0
-			}
-
-		case dnssec.ERROR:
-			switch result {
-			case dnssec.OK:
-				newState = dnssec.OK
-			}
-		}
-
-		if state == newState {
+		after := s.Transition(result)
+		if before == after {
 			continue
 		}
-		if state == dnssec.ERROR || newState == dnssec.ERROR {
-			log.Printf("[%v] (state %v) new state: %v", domain, state, newState)
-			if err := email(domain, newState.String(), details); err != nil {
+		if before == dnssec.ERROR || after == dnssec.ERROR {
+			log.Printf("[%v] (state %v) new state: %v", domain, before, after)
+			if err := email(domain, after.String(), details); err != nil {
 				log.Printf("[%v] email error: %v", domain, err)
 			}
 		}
-		state = newState
 	}
+}
+
+type monitorState struct {
+	current  dnssec.Status
+	warnings int
+}
+
+func (s *monitorState) State() dnssec.Status {
+	return s.current
+}
+
+// Transition operates the monitor state machine: OK, WARNING, ERROR.
+// 3 consecutive warnings, we transition to ERROR.
+// Transitions in or out of ERROR generate an alert.
+//                  +----> OK <--+
+//                  |            |
+//                  v            v
+//              WARNING ------> ERROR
+func (s *monitorState) Transition(result dnssec.Status) dnssec.Status {
+	switch s.current {
+	case dnssec.OK:
+		s.current = result
+
+	case dnssec.WARNING:
+		switch result {
+		case dnssec.OK:
+			s.warnings = 0
+			s.current = dnssec.OK
+		case dnssec.WARNING:
+			s.warnings++
+			if s.warnings > 3 {
+				s.warnings = 0
+				s.current = dnssec.ERROR
+			}
+		case dnssec.ERROR:
+			s.warnings = 0
+			s.current = dnssec.ERROR
+		}
+
+	case dnssec.ERROR:
+		switch result {
+		case dnssec.OK:
+			s.current = dnssec.OK
+		}
+	}
+
+	return s.current
 }
 
 func email(domain, state, details string) error {

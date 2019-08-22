@@ -70,6 +70,33 @@ OK: RRSIG=61206 and DNSKEY=61206 verifies the A RRset
 `,
 			status: WARNING,
 		},
+		{
+			filename: "testdata/red.htm",
+			want: `# .
+OK: Found 2 DNSKEY records for .
+OK: DS=20326/SHA-256 verifies DNSKEY=20326/SEP
+OK: Found 1 RRSIGs over DNSKEY RRset
+OK: RRSIG=20326 and DNSKEY=20326/SEP verifies the DNSKEY RRset
+# net
+OK: Found 1 DS records for net in the . zone
+OK: DS=35886/SHA-256 has algorithm RSASHA256
+OK: Found 1 RRSIGs over DS RRset
+OK: RRSIG=59944 and DNSKEY=59944 verifies the DS RRset
+OK: Found 3 DNSKEY records for net
+OK: DS=35886/SHA-256 verifies DNSKEY=35886/SEP
+OK: Found 1 RRSIGs over DNSKEY RRset
+OK: RRSIG=35886 and DNSKEY=35886/SEP verifies the DNSKEY RRset
+# stalkr.net
+ERROR: No DS records found for stalkr.net in the net zone
+OK: Found 1 DNSKEY records for stalkr.net
+OK: Found 1 RRSIGs over DNSKEY RRset
+OK: RRSIG=1363 and DNSKEY=1363/SEP verifies the DNSKEY RRset
+OK: stalkr.net A RR has value 51.38.54.48
+OK: Found 1 RRSIGs over A RRset
+OK: RRSIG=1363 and DNSKEY=1363/SEP verifies the A RRset
+`,
+			status: ERROR,
+		},
 	} {
 		b, err := ioutil.ReadFile(tt.filename)
 		if err != nil {

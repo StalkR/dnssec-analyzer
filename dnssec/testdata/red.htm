@@ -1,0 +1,1531 @@
+
+<!DOCTYPE html
+  PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+   "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en-US" xml:lang="en-US">
+<head>
+<title>DNSSEC Analyzer - stalkr.net</title>
+<meta name="description" content="The DNSSEC Analyzer from VeriSign Labs is an on-line tool to assist with diagnosing problems with DNSSEC-signed names and zones." />
+<meta name="keywords" content="dns dnssec test testing debug debugger validate" />
+<link rel="stylesheet" type="text/css" href="https://tools.verisignlabs.com/style.css" media="screen"/>
+<style type="text/css">
+<!--/* <![CDATA[ */
+TABLE.T1 {border-collapse:collapse; }
+TABLE.T1 tr td {border:1px solid black; padding:0.3em 1em;}
+TABLE.T1 tr td.T1L {text-align:center;}
+TABLE.T2 {text-align:left; border-style:none; border-collapse:separate;}
+TABLE.T2 tr td {border-style:none; padding:0px 0.2em; }
+tr.L0 {background-color:#ffffff;}
+tr.L1 {background-color:#dfdfdf;}
+tr.L2 {background-color:#bfbfbf;}
+tr.L3 {background-color:#9f9f9f;}
+body {background-color:#ffffff;}
+body {font-family: Arial, Helvetica, sans-serif;}
+span.keytag { font-size:75%; }
+A.adv {text-decoration:none;}
+.adv P {}
+/* circles */
+.circle { display:block; width:1em; height:1em; -moz-border-radius:0.6em; -webkit-border-radius:0.6em; }
+.red { background:red; }
+.green { background:green; }
+.yellow { background:yellow; }
+/* tooltips */
+#tt     { position:absolute; display:block; background:#CCC; color:black; border:2px solid black;}
+#tt p { margin:1em; }
+
+
+/* ]]> */-->
+</style>
+<script type="text/javascript">//<![CDATA[
+/**
+ * getElements(classname, tagname, root):
+ * Return an array of DOM elements that are members of the specified class,
+ * have the specified tagname, and are descendants of the specified root.
+ * 
+ * If no classname is specified, elements are returned regardless of class.
+ * If no tagname is specified, elements are returned regardless of tagname.
+ * If no root is specified, the document object is used.  If the specified
+ * root is a string, it is an element id, and the root
+ * element is looked up using getElementsById()
+ */
+function getElements(classname, tagname, root) {
+    // If no root was specified, use the entire document
+    // If a string was specified, look it up
+    if (!root) root = document;
+    else if (typeof root == "string") root = document.getElementById(root);
+    // if no tagname was specified, use all tags
+    if (!tagname) tagname = "*";
+    // Find all descendants of the specified root with the specified tagname
+    var all = root.getElementsByTagName(tagname);
+    // If no classname was specified, we return all tags
+    if (!classname) return all;
+    // Otherwise, we filter the element by classname
+    var elements = [];  // Start with an emtpy array
+    for(var i = 0; i < all.length; i++) {
+  var element = all[i];
+  if (isMember(element, classname)) // isMember() is defined below
+      elements.push(element);       // Add class members to our array
+    }
+    // Note that we always return an array, even if it is empty
+    return elements;
+    // Determine whether the specified element is a member of the specified
+    // class.  This function is optimized for the common case in which the 
+    // className property contains only a single classname.  But it also 
+    // handles the case in which it is a list of whitespace-separated classes.
+    function isMember(element, classname) {
+  var classes = element.className;  // Get the list of classes
+  if (!classes) return false;             // No classes defined
+  if (classes == classname) return true;  // Exact match
+  // We didn't match exactly, so if there is no whitespace, then 
+  // this element is not a member of the class
+  var whitespace = /\s+/;
+  if (!whitespace.test(classes)) return false;
+  // If we get here, the element is a member of more than one class and
+  // we've got to check them individually.
+  var c = classes.split(whitespace);  // Split with whitespace delimiter
+  for(var i = 0; i < c.length; i++) { // Loop through classes
+      if (c[i] == classname) return true;  // and check for matches
+  }
+  return false;  // None of the classes matched
+    }
+}
+function submitenter(myfield,e) {
+  var keycode;
+  if (window.event) keycode = window.event.keyCode;
+  else if (e) keycode = e.which;
+  else return true;
+  if (keycode == 13) {
+    myfield.form.submit();
+      return false;
+  }
+  return true;
+}
+function xToggleDisplay(d) {
+  if (document.getElementById(d).style.display == "")
+    document.getElementById(d).style.display = "none";  
+  else
+    document.getElementById(d).style.display = "";
+}
+function toggleByClass(c) {
+  var e = getElements(c, 0, document);
+  for (j=0; j<e.length; j++) {
+    if (e[j].style.display == "")
+      e[j].style.display = "none";
+    else
+      e[j].style.display = "";
+  }
+}
+
+//]]></script>
+<script type="text/javascript">//<![CDATA[
+var dbg_lvl = 0;
+function rowsDisplay() {
+  for (l=0; l<4; l++) {
+    var d = l <= dbg_lvl ? "" : "none";
+    var c = "L"+l;
+    var rows = getElements(c, "TR", document);
+    for (j=0; j<rows.length; j++)
+      rows[j].style.display=d;
+  }
+}
+function debugMore() {
+  if (dbg_lvl < 3) dbg_lvl++;
+  rowsDisplay();
+}
+function debugLess() {
+  if (dbg_lvl > 0) dbg_lvl--;
+  rowsDisplay();
+}
+function detectEvent(e) {
+  var evt = e || window.event;
+  if (43 == evt.charCode) debugMore();
+  if (45 == evt.charCode) debugLess();
+}
+document.onkeypress = detectEvent;
+
+//]]></script>
+<script type="text/javascript">//<![CDATA[
+// From http://sandbox.leigeber.com/tooltip/
+//
+var tooltip=function(){
+  var id = 'tt';
+  var maxw = 400;
+  var speed = 10;
+  var timer = 20;
+  var endalpha = 100;
+  var alpha = 0;
+  var tt,h;
+  var ie = document.all ? true : false;
+  return{
+    show:function(v,w){
+      var bw = Geometry.getViewportWidth();
+      var bh = Geometry.getViewportHeight();
+      var bx = Geometry.getHorizontalScroll();
+      var by = Geometry.getVerticalScroll();
+      if (tt == null) {
+        tt = document.createElement('div');
+        tt.setAttribute('id',id);
+        document.body.appendChild(tt);
+        tt.style.opacity = 0;
+        tt.style.filter = 'alpha(opacity=0)';
+        //document.onmousemove = this.pos;
+      }
+      tt.style.display = 'block';
+      tt.innerHTML = v;
+      var tw = bw;
+      do {
+        tw -= 10;
+        tt.style.width = tw + 'px';
+        tt.style.height = 'auto';
+        h = parseInt(tt.offsetHeight);
+        w = parseInt(tt.offsetWidth);
+      } while ((w/h) > (bw/bh));
+      tt.style.top = by + ((bh - h) / 2) + 'px';
+      tt.style.left = bx + ((bw - w) / 2) + 'px';
+      clearInterval(tt.timer);
+      tt.timer = setInterval(function(){tooltip.fade(1)},timer);
+    },
+    pos:function(e){
+      // not used when "onmousemove" above commented out
+      var u = ie ? event.clientY + document.documentElement.scrollTop : e.pageY;
+      var l = ie ? event.clientX + document.documentElement.scrollLeft : e.pageX;
+      tt.style.top = (u - h) + 'px';
+      tt.style.left = (l + left) + 'px';
+    },
+    fade:function(d){
+      var a = alpha;
+      if((a != endalpha && d == 1) || (a != 0 && d == -1)){
+        var i = speed;
+        if(endalpha - a < speed && d == 1){
+          i = endalpha - a;
+        }else if(alpha < speed && d == -1){
+          i = a;
+        }
+        alpha = a + (i * d);
+        tt.style.opacity = alpha * .01;
+        tt.style.filter = 'alpha(opacity=' + alpha + ')';
+      }else{
+        clearInterval(tt.timer);
+        if(d == -1){tt.style.display = 'none'}
+      }
+    },
+    hide:function(){
+      clearInterval(tt.timer);
+      tt.timer = setInterval(function(){tooltip.fade(-1)},timer);
+    }
+  };
+}();
+
+//]]></script>
+<meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1" />
+</head>
+<body>
+<script type="text/javascript">//<![CDATA[
+/*
+ * From http://www.davidflanagan.com/javascript5/display.php?n=14-2&f=14/Geometry.js
+ * This code is from the book JavaScript: The Definitive Guide, 5th Edition,
+ * by David Flanagan. Copyright 2006 O'Reilly Media, Inc. (ISBN #0596101996)
+ */
+/**
+ * Geometry.js: portable functions for querying window and document geometry
+ *
+ * This module defines functions for querying window and document geometry.
+ * 
+ * getWindowX/Y(): return the position of the window on the screen
+ * getViewportWidth/Height(): return the size of the browser viewport area
+ * getDocumentWidth/Height(): return the size of the document.
+ * getHorizontalScroll(): return the position of the horizontal scrollbar
+ * getVerticalScroll(): return the position of the vertical scrollbar
+ *
+ * Note that there is no portable way to query the overall size of the 
+ * browser window, so there are no getWindowWidth/Height() functions.
+ * 
+ * IMPORTANT: This module must be included in the <body> of a document
+ *            instead of the <head> of the document.
+ */
+var Geometry = {};
+
+if (window.screenLeft) { // IE and others
+    Geometry.getWindowX = function() { return window.screenLeft; };
+    Geometry.getWindowY = function() { return window.screenTop; };
+}
+else if (window.screenX) { // Firefox and others
+    Geometry.getWindowX = function() { return window.screenX; };
+    Geometry.getWindowY = function() { return window.screenY; };
+}
+
+if (window.innerWidth) { // All browsers but IE
+    Geometry.getViewportWidth = function() { return window.innerWidth; };
+    Geometry.getViewportHeight = function() { return window.innerHeight; };
+    Geometry.getHorizontalScroll = function() { return window.pageXOffset; };
+    Geometry.getVerticalScroll = function() { return window.pageYOffset; };
+}
+else if (document.documentElement && document.documentElement.clientWidth) {
+    // These functions are for IE6 when there is a DOCTYPE
+    Geometry.getViewportWidth =
+  function() { return document.documentElement.clientWidth; };
+    Geometry.getViewportHeight = 
+  function() { return document.documentElement.clientHeight; };
+    Geometry.getHorizontalScroll = 
+  function() { return document.documentElement.scrollLeft; };
+    Geometry.getVerticalScroll = 
+  function() { return document.documentElement.scrollTop; };
+}
+else if (document.body.clientWidth) {
+    // These are for IE4, IE5, and IE6 without a DOCTYPE
+    Geometry.getViewportWidth =
+  function() { return document.body.clientWidth; };
+    Geometry.getViewportHeight =
+  function() { return document.body.clientHeight; };
+    Geometry.getHorizontalScroll =
+  function() { return document.body.scrollLeft; };
+    Geometry.getVerticalScroll = 
+  function() { return document.body.scrollTop; };
+}
+
+// These functions return the size of the document.  They are not window 
+// related, but they are useful to have here anyway.
+if (document.documentElement && document.documentElement.scrollWidth) {
+    Geometry.getDocumentWidth =
+  function() { return document.documentElement.scrollWidth; };
+    Geometry.getDocumentHeight =
+  function() { return document.documentElement.scrollHeight; };
+}
+else if (document.body.scrollWidth) {
+    Geometry.getDocumentWidth =
+  function() { return document.body.scrollWidth; };
+    Geometry.getDocumentHeight =
+  function() { return document.body.scrollHeight; };
+}
+//]]</script>
+<form method="post" action="/stalkr.net" enctype="multipart/form-data">  <div class="header">
+  <a href="http://www.verisign.com/en_US/innovation/verisign-labs/index.xhtml"><img src="https://tools.verisignlabs.com/img/vlabs_logo.png" width="285" height="62" alt="Verisign Inc | Labs" class="logo"></a>
+  <a href="http://www.verisign.com/en_US/innovation/verisign-labs/internet-security-tools/index.xhtml"class="back">Back to Verisign Labs Tools</a>
+  <div class="stripe"><img src="https://tools.verisignlabs.com/img/nav_end.png" width="11" height="28" alt=" "></div>
+  <div style="clear:both"></div>
+<table class="hdr" width="100%"><tr><td style="text-align:left; width:40%;">Domain Name: <input type="text" name="q" value="stalkr.net" onkeypress="return submitenter(this,event)" /></td> <td style="text-align:center; width:auto;">Detail: <a href="javascript:debugMore();">more(+)</a> / <a href="javascript:debugLess();">less(-)</a></td> <td style="text-align:right; width:40%;">Time: 2019-08-22 21:20:59 UTC, NTP stratum 4</td></tr></table><h2>Analyzing DNSSEC problems for <a href="/stalkr.net">stalkr.net</a></h2><table class="T1"><tr class="L1" style="display:none;">
+<td>&nbsp;</td>
+<td>DS<span class="keytag">=20326/SHA-256</span> is now in the chain-of-trust</td>
+</tr>
+<TR>
+<TD CLASS="T1L">.</TD>
+<TD>
+<TABLE CLASS="T2">
+<tr class="L1" style="display:none;">
+<td>&nbsp;</td>
+<td>Checking DS between Trust Anchor and .</td>
+</tr>
+<tr class="L1" style="display:none;">
+<td>&nbsp;</td>
+<td><code>. IN  DS  ( 20326 8 2 
+  e06d44b80b8f1d39a95c0b0d7c65d08458e880409bbc683457104237c7f8ec8d )</code></td>
+</tr>
+<tr class="L2" style="display:none;">
+<td>&nbsp;</td>
+<td>Query to h.root-servers.net for ./DNSKEY</td>
+</tr>
+<tr class="L2" style="display:none;">
+<td>&nbsp;</td>
+<td>Received 864 bytes from 198.97.190.53</td>
+</tr>
+<tr class="L3" style="display:none;">
+<td>&nbsp;</td>
+<td><pre>;; Answer received from 198.97.190.53 (864 bytes)
+;; HEADER SECTION
+;;  id = 58563
+;;  qr = 1  aa = 1  tc = 0  rd = 0  opcode = QUERY
+;;  ra = 0  z  = 0  ad = 0  cd = 0  rcode  = NOERROR
+;;  qdcount = 1 ancount = 3 nscount = 0 arcount = 1
+;;  do = 1
+;; EDNS version 0
+;;  flags:  8000
+;;  rcode:  NOERROR
+;;  size: 4096
+;;  option: 
+
+;; QUESTION SECTION (1 record)
+;; .  IN  DNSKEY
+
+;; ANSWER SECTION (3 records)
+. 172800  IN  DNSKEY  ( 256 3 8
+  AwEAAcTQyaIe6nt3xSPOG2L/YfwBkOVTJN6mlnZ249O5Rtt3ZSRQHxQSW61AODYw6bvgxrrGq8ee
+  OuenFjcSYgNAMcBYoEYYmKDW6e9EryW4ZaT/MCq+8Am06oR40xAA3fClOM6QjRcT85tP41Go946A
+  icBGP8XOP/Aj1aI/oPRGzRnboUPUok/AzTNnW5npBU69+BuiIwYE7mQOiNBFePyvjQBdoiuYbmuD
+  3Py0IyjlBxzZUXbqLsRL9gYFkCqeTY29Ik7usuzMTa+JRSLz6KGS5RSJ7CTSMjZg8aNaUbN2dvGh
+  akJPh92HnLvMA3TefFgbKJphFNPA3BWSKLZ02cRWXqM= ) ; Key ID = 59944
+. 172800  IN  DNSKEY  ( 257 3 8
+  AwEAAaz/tAm8yTn4Mfeh5eyI96WSVexTBAvkMgJzkKTOiW1vkIbzxeF3+/4RgWOq7HrxRixHlFlE
+  xOLAJr5emLvN7SWXgnLh4+B5xQlNVz8Og8kvArMtNROxVQuCaSnIDdD5LKyWbRd2n9WGe2R8PzgC
+  mr3EgVLrjyBxWezF0jLHwVN8efS3rCj/EWgvIWgb9tarpVUDK/b58Da+sqqls3eNbuv7pr+eoZG+
+  SrDK6nWeL3c6H5Apxz7LjVc1uTIdsIXxuOLYA4/ilBmSVIzuDWfdRUfhHdY6+cn8HFRm+2hM8AnX
+  GXws9555KrUB5qihylGa8subX2Nn6UwNR1AkUTV74bU= ) ; Key ID = 20326
+. 172800  IN  RRSIG ( DNSKEY 8 0 172800 20190910000000 20190820000000 20326 .
+  myqQxVqqg5Yb0Tx+BDiLM672R1pZi5zzgRAWh3SkK4mQponWEdXVglCRl6VxIDqnbi5NKabyHMBc
+  w+k4hbBjA1TZ0f+cyJa8xxTg8m7caHrdIRDNwr1zFa16L5BO55NWCjyTCwc/IgRU+Q5zS1YX/qdy
+  uDsWsuRxhxclK5Knxc35Z0Pj0/xlBVzatlwloBVtnSpetAHyofMq9J/ylHDdQtfDjC3B/cBE1/TA
+  UR8cJ2hZXlBBkR0q3Nb0dc6CG8647F8Rp9NOPNn6529HFjARFOPKps2ujLqzrLD4wuKzU3B3yOBe
+  Vqv80rPiSnz0po25KwxFuQYXhAPlNQRtVLdjDw== )
+
+;; AUTHORITY SECTION (0 records)
+
+;; ADDITIONAL SECTION (1 record)
+;; EDNS version 0
+;;  flags:  8000
+;;  rcode:  NOERROR
+;;  size: 4096
+;;  option: 
+
+
+</pre></td>
+</tr>
+<tr class="L0" style="">
+<td><img style="width:1em;" src="/green.png"  /></td>
+<td>Found 2 DNSKEY records for .</td>
+</tr>
+<tr class="L1" style="display:none;">
+<td>&nbsp;</td>
+<td><code>. 172800  IN  DNSKEY  ( 256 3 8
+  AwEAAcTQyaIe6nt3xSPOG2L/YfwBkOVTJN6mlnZ249O5Rtt3ZSRQHxQSW61AODYw6bvgxrrGq8ee
+  OuenFjcSYgNAMcBYoEYYmKDW6e9EryW4ZaT/MCq+8Am06oR40xAA3fClOM6QjRcT85tP41Go946A
+  icBGP8XOP/Aj1aI/oPRGzRnboUPUok/AzTNnW5npBU69+BuiIwYE7mQOiNBFePyvjQBdoiuYbmuD
+  3Py0IyjlBxzZUXbqLsRL9gYFkCqeTY29Ik7usuzMTa+JRSLz6KGS5RSJ7CTSMjZg8aNaUbN2dvGh
+  akJPh92HnLvMA3TefFgbKJphFNPA3BWSKLZ02cRWXqM= ) ; Key ID = 59944</code></td>
+</tr>
+<tr class="L1" style="display:none;">
+<td>&nbsp;</td>
+<td><code>. 172800  IN  DNSKEY  ( 257 3 8
+  AwEAAaz/tAm8yTn4Mfeh5eyI96WSVexTBAvkMgJzkKTOiW1vkIbzxeF3+/4RgWOq7HrxRixHlFlE
+  xOLAJr5emLvN7SWXgnLh4+B5xQlNVz8Og8kvArMtNROxVQuCaSnIDdD5LKyWbRd2n9WGe2R8PzgC
+  mr3EgVLrjyBxWezF0jLHwVN8efS3rCj/EWgvIWgb9tarpVUDK/b58Da+sqqls3eNbuv7pr+eoZG+
+  SrDK6nWeL3c6H5Apxz7LjVc1uTIdsIXxuOLYA4/ilBmSVIzuDWfdRUfhHdY6+cn8HFRm+2hM8AnX
+  GXws9555KrUB5qihylGa8subX2Nn6UwNR1AkUTV74bU= ) ; Key ID = 20326</code></td>
+</tr>
+<tr class="L1" style="display:none;">
+<td>&nbsp;</td>
+<td>DNSKEY<span class="keytag">=20326/SEP</span> is now in the chain-of-trust</td>
+</tr>
+<tr class="L0" style="">
+<td><img style="width:1em;" src="/green.png"  /></td>
+<td>DS<span class="keytag">=20326/SHA-256</span> verifies DNSKEY<span class="keytag">=20326/SEP</span></td>
+</tr>
+<tr class="L0" style="">
+<td><img style="width:1em;" src="/green.png"  /></td>
+<td>Found 1 RRSIGs over DNSKEY RRset</td>
+</tr>
+<tr class="L1" style="display:none;">
+<td>&nbsp;</td>
+<td><code>. 172800  IN  RRSIG ( DNSKEY 8 0 172800 20190910000000 20190820000000 20326 .
+  myqQxVqqg5Yb0Tx+BDiLM672R1pZi5zzgRAWh3SkK4mQponWEdXVglCRl6VxIDqnbi5NKabyHMBc
+  w+k4hbBjA1TZ0f+cyJa8xxTg8m7caHrdIRDNwr1zFa16L5BO55NWCjyTCwc/IgRU+Q5zS1YX/qdy
+  uDsWsuRxhxclK5Knxc35Z0Pj0/xlBVzatlwloBVtnSpetAHyofMq9J/ylHDdQtfDjC3B/cBE1/TA
+  UR8cJ2hZXlBBkR0q3Nb0dc6CG8647F8Rp9NOPNn6529HFjARFOPKps2ujLqzrLD4wuKzU3B3yOBe
+  Vqv80rPiSnz0po25KwxFuQYXhAPlNQRtVLdjDw== )</code></td>
+</tr>
+<tr class="L0" style="">
+<td><img style="width:1em;" src="/green.png"  /></td>
+<td>RRSIG<span class="keytag">=20326</span> and DNSKEY<span class="keytag">=20326/SEP</span> verifies the DNSKEY RRset</td>
+</tr>
+<tr class="L1" style="display:none;">
+<td>&nbsp;</td>
+<td>DNSKEY<span class="keytag">=59944</span> is now in the chain-of-trust</td>
+</tr>
+<tr class="L2" style="display:none;">
+<td>&nbsp;</td>
+<td>Query to b.root-servers.net for stalkr.net/A</td>
+</tr>
+<tr class="L2" style="display:none;">
+<td>&nbsp;</td>
+<td>Received 1167 bytes from 199.9.14.201</td>
+</tr>
+<tr class="L3" style="display:none;">
+<td>&nbsp;</td>
+<td><pre>;; Answer received from 199.9.14.201 (1167 bytes)
+;; HEADER SECTION
+;;  id = 11936
+;;  qr = 1  aa = 0  tc = 0  rd = 0  opcode = QUERY
+;;  ra = 0  z  = 0  ad = 0  cd = 0  rcode  = NOERROR
+;;  qdcount = 1 ancount = 0 nscount = 15  arcount = 27
+;;  do = 1
+;; EDNS version 0
+;;  flags:  8000
+;;  rcode:  NOERROR
+;;  size: 4096
+;;  option: 
+
+;; QUESTION SECTION (1 record)
+;; stalkr.net.  IN  A
+
+;; ANSWER SECTION (0 records)
+
+;; AUTHORITY SECTION (15 records)
+net.  172800  IN  NS  i.gtld-servers.net.
+net.  172800  IN  NS  e.gtld-servers.net.
+net.  172800  IN  NS  h.gtld-servers.net.
+net.  172800  IN  NS  b.gtld-servers.net.
+net.  172800  IN  NS  f.gtld-servers.net.
+net.  172800  IN  NS  m.gtld-servers.net.
+net.  172800  IN  NS  d.gtld-servers.net.
+net.  172800  IN  NS  c.gtld-servers.net.
+net.  172800  IN  NS  a.gtld-servers.net.
+net.  172800  IN  NS  g.gtld-servers.net.
+net.  172800  IN  NS  l.gtld-servers.net.
+net.  172800  IN  NS  j.gtld-servers.net.
+net.  172800  IN  NS  k.gtld-servers.net.
+net.  86400 IN  DS  ( 35886 8 2 
+  7862b27f5f516ebe19680444d4ce5e762981931842c465f00236401d8bd973ee )
+net.  86400 IN  RRSIG ( DS 8 1 86400 20190904170000 20190822160000 59944 .
+  vHsLFJ6AM1ikgAfIjrzqaYNp0YPPq7z7Rw0walZ++n1z1JUUk5d0qev0vkGQ9UusgyvSoAag3G3n
+  iw7USxHf/Id/adR/UJTJXHEW/dsVz7FGLrpMWGukWcGccA/Xzl+IUl8HRmowV47Ve8Y7Ibsmt6+I
+  5zHDeuTb7LSphXx76uQTploK+oPTYuoDBUPfNqcQc6XUJXaU1gx4WM0QQQTjoDpRkGu5p74ST9K/
+  ASQnD8GMkXHC7kFp3EzJ9JMyKabv0gMqYshsj3m9e6qAKpbNYKA7HycyPonLTg7AucuOmzkIRnyW
+  bHfnk0p6RfkG/KUHUsMxq4KftIVQiTp+Ymq1lw== )
+
+;; ADDITIONAL SECTION (27 records)
+a.gtld-servers.net. 172800  IN  A 192.5.6.30
+b.gtld-servers.net. 172800  IN  A 192.33.14.30
+c.gtld-servers.net. 172800  IN  A 192.26.92.30
+d.gtld-servers.net. 172800  IN  A 192.31.80.30
+e.gtld-servers.net. 172800  IN  A 192.12.94.30
+f.gtld-servers.net. 172800  IN  A 192.35.51.30
+g.gtld-servers.net. 172800  IN  A 192.42.93.30
+h.gtld-servers.net. 172800  IN  A 192.54.112.30
+i.gtld-servers.net. 172800  IN  A 192.43.172.30
+j.gtld-servers.net. 172800  IN  A 192.48.79.30
+k.gtld-servers.net. 172800  IN  A 192.52.178.30
+l.gtld-servers.net. 172800  IN  A 192.41.162.30
+m.gtld-servers.net. 172800  IN  A 192.55.83.30
+a.gtld-servers.net. 172800  IN  AAAA  2001:503:a83e::2:30
+b.gtld-servers.net. 172800  IN  AAAA  2001:503:231d::2:30
+c.gtld-servers.net. 172800  IN  AAAA  2001:503:83eb::30
+d.gtld-servers.net. 172800  IN  AAAA  2001:500:856e::30
+e.gtld-servers.net. 172800  IN  AAAA  2001:502:1ca1::30
+f.gtld-servers.net. 172800  IN  AAAA  2001:503:d414::30
+g.gtld-servers.net. 172800  IN  AAAA  2001:503:eea3::30
+h.gtld-servers.net. 172800  IN  AAAA  2001:502:8cc::30
+i.gtld-servers.net. 172800  IN  AAAA  2001:503:39c1::30
+j.gtld-servers.net. 172800  IN  AAAA  2001:502:7094::30
+k.gtld-servers.net. 172800  IN  AAAA  2001:503:d2d::30
+l.gtld-servers.net. 172800  IN  AAAA  2001:500:d937::30
+m.gtld-servers.net. 172800  IN  AAAA  2001:501:b1f9::30
+;; EDNS version 0
+;;  flags:  8000
+;;  rcode:  NOERROR
+;;  size: 4096
+;;  option: 
+
+
+</pre></td>
+</tr>
+<tr class="L2" style="display:none;">
+<td>&nbsp;</td>
+<td>Query to a.root-servers.net for net/DNSKEY</td>
+</tr>
+<tr class="L2" style="display:none;">
+<td>&nbsp;</td>
+<td>Received 1160 bytes from 198.41.0.4</td>
+</tr>
+<tr class="L3" style="display:none;">
+<td>&nbsp;</td>
+<td><pre>;; Answer received from 198.41.0.4 (1160 bytes)
+;; HEADER SECTION
+;;  id = 60554
+;;  qr = 1  aa = 0  tc = 0  rd = 0  opcode = QUERY
+;;  ra = 0  z  = 0  ad = 0  cd = 0  rcode  = NOERROR
+;;  qdcount = 1 ancount = 0 nscount = 15  arcount = 27
+;;  do = 1
+;; EDNS version 0
+;;  flags:  8000
+;;  rcode:  NOERROR
+;;  size: 4096
+;;  option: 
+
+;; QUESTION SECTION (1 record)
+;; net. IN  DNSKEY
+
+;; ANSWER SECTION (0 records)
+
+;; AUTHORITY SECTION (15 records)
+net.  172800  IN  NS  e.gtld-servers.net.
+net.  172800  IN  NS  f.gtld-servers.net.
+net.  172800  IN  NS  m.gtld-servers.net.
+net.  172800  IN  NS  i.gtld-servers.net.
+net.  172800  IN  NS  j.gtld-servers.net.
+net.  172800  IN  NS  b.gtld-servers.net.
+net.  172800  IN  NS  a.gtld-servers.net.
+net.  172800  IN  NS  c.gtld-servers.net.
+net.  172800  IN  NS  k.gtld-servers.net.
+net.  172800  IN  NS  h.gtld-servers.net.
+net.  172800  IN  NS  l.gtld-servers.net.
+net.  172800  IN  NS  g.gtld-servers.net.
+net.  172800  IN  NS  d.gtld-servers.net.
+net.  86400 IN  DS  ( 35886 8 2 
+  7862b27f5f516ebe19680444d4ce5e762981931842c465f00236401d8bd973ee )
+net.  86400 IN  RRSIG ( DS 8 1 86400 20190904170000 20190822160000 59944 .
+  vHsLFJ6AM1ikgAfIjrzqaYNp0YPPq7z7Rw0walZ++n1z1JUUk5d0qev0vkGQ9UusgyvSoAag3G3n
+  iw7USxHf/Id/adR/UJTJXHEW/dsVz7FGLrpMWGukWcGccA/Xzl+IUl8HRmowV47Ve8Y7Ibsmt6+I
+  5zHDeuTb7LSphXx76uQTploK+oPTYuoDBUPfNqcQc6XUJXaU1gx4WM0QQQTjoDpRkGu5p74ST9K/
+  ASQnD8GMkXHC7kFp3EzJ9JMyKabv0gMqYshsj3m9e6qAKpbNYKA7HycyPonLTg7AucuOmzkIRnyW
+  bHfnk0p6RfkG/KUHUsMxq4KftIVQiTp+Ymq1lw== )
+
+;; ADDITIONAL SECTION (27 records)
+e.gtld-servers.net. 172800  IN  A 192.12.94.30
+e.gtld-servers.net. 172800  IN  AAAA  2001:502:1ca1::30
+f.gtld-servers.net. 172800  IN  A 192.35.51.30
+f.gtld-servers.net. 172800  IN  AAAA  2001:503:d414::30
+m.gtld-servers.net. 172800  IN  A 192.55.83.30
+m.gtld-servers.net. 172800  IN  AAAA  2001:501:b1f9::30
+i.gtld-servers.net. 172800  IN  A 192.43.172.30
+i.gtld-servers.net. 172800  IN  AAAA  2001:503:39c1::30
+j.gtld-servers.net. 172800  IN  A 192.48.79.30
+j.gtld-servers.net. 172800  IN  AAAA  2001:502:7094::30
+b.gtld-servers.net. 172800  IN  A 192.33.14.30
+b.gtld-servers.net. 172800  IN  AAAA  2001:503:231d::2:30
+a.gtld-servers.net. 172800  IN  A 192.5.6.30
+a.gtld-servers.net. 172800  IN  AAAA  2001:503:a83e::2:30
+c.gtld-servers.net. 172800  IN  A 192.26.92.30
+c.gtld-servers.net. 172800  IN  AAAA  2001:503:83eb::30
+k.gtld-servers.net. 172800  IN  A 192.52.178.30
+k.gtld-servers.net. 172800  IN  AAAA  2001:503:d2d::30
+h.gtld-servers.net. 172800  IN  A 192.54.112.30
+h.gtld-servers.net. 172800  IN  AAAA  2001:502:8cc::30
+l.gtld-servers.net. 172800  IN  A 192.41.162.30
+l.gtld-servers.net. 172800  IN  AAAA  2001:500:d937::30
+g.gtld-servers.net. 172800  IN  A 192.42.93.30
+g.gtld-servers.net. 172800  IN  AAAA  2001:503:eea3::30
+d.gtld-servers.net. 172800  IN  A 192.31.80.30
+d.gtld-servers.net. 172800  IN  AAAA  2001:500:856e::30
+;; EDNS version 0
+;;  flags:  8000
+;;  rcode:  NOERROR
+;;  size: 4096
+;;  option: 
+
+
+</pre></td>
+</tr>
+<tr class="L1" style="display:none;">
+<td>&nbsp;</td>
+<td>Found child zone net</td>
+</tr>
+</TABLE>
+</TD>
+</TR>
+<TR>
+<TD CLASS="T1L">net</TD>
+<TD>
+<TABLE CLASS="T2">
+<tr class="L1" style="display:none;">
+<td>&nbsp;</td>
+<td>Checking DS between . and net</td>
+</tr>
+<tr class="L2" style="display:none;">
+<td>&nbsp;</td>
+<td>Query to a.root-servers.net for net/DS</td>
+</tr>
+<tr class="L2" style="display:none;">
+<td>&nbsp;</td>
+<td>Received 367 bytes from 198.41.0.4</td>
+</tr>
+<tr class="L3" style="display:none;">
+<td>&nbsp;</td>
+<td><pre>;; Answer received from 198.41.0.4 (367 bytes)
+;; HEADER SECTION
+;;  id = 20563
+;;  qr = 1  aa = 1  tc = 0  rd = 0  opcode = QUERY
+;;  ra = 0  z  = 0  ad = 0  cd = 0  rcode  = NOERROR
+;;  qdcount = 1 ancount = 2 nscount = 0 arcount = 1
+;;  do = 1
+;; EDNS version 0
+;;  flags:  8000
+;;  rcode:  NOERROR
+;;  size: 4096
+;;  option: 
+
+;; QUESTION SECTION (1 record)
+;; net. IN  DS
+
+;; ANSWER SECTION (2 records)
+net.  86400 IN  DS  ( 35886 8 2 
+  7862b27f5f516ebe19680444d4ce5e762981931842c465f00236401d8bd973ee )
+net.  86400 IN  RRSIG ( DS 8 1 86400 20190904170000 20190822160000 59944 .
+  vHsLFJ6AM1ikgAfIjrzqaYNp0YPPq7z7Rw0walZ++n1z1JUUk5d0qev0vkGQ9UusgyvSoAag3G3n
+  iw7USxHf/Id/adR/UJTJXHEW/dsVz7FGLrpMWGukWcGccA/Xzl+IUl8HRmowV47Ve8Y7Ibsmt6+I
+  5zHDeuTb7LSphXx76uQTploK+oPTYuoDBUPfNqcQc6XUJXaU1gx4WM0QQQTjoDpRkGu5p74ST9K/
+  ASQnD8GMkXHC7kFp3EzJ9JMyKabv0gMqYshsj3m9e6qAKpbNYKA7HycyPonLTg7AucuOmzkIRnyW
+  bHfnk0p6RfkG/KUHUsMxq4KftIVQiTp+Ymq1lw== )
+
+;; AUTHORITY SECTION (0 records)
+
+;; ADDITIONAL SECTION (1 record)
+;; EDNS version 0
+;;  flags:  8000
+;;  rcode:  NOERROR
+;;  size: 4096
+;;  option: 
+
+
+</pre></td>
+</tr>
+<tr class="L0" style="">
+<td><img style="width:1em;" src="/green.png"  /></td>
+<td>Found 1 DS records for net in the . zone</td>
+</tr>
+<tr class="L0" style="">
+<td><img style="width:1em;" src="/green.png"  /></td>
+<td>DS<span class="keytag">=35886/SHA-256</span> has algorithm RSASHA256</td>
+</tr>
+<tr class="L0" style="">
+<td><img style="width:1em;" src="/green.png"  /></td>
+<td>Found 1 RRSIGs over DS RRset</td>
+</tr>
+<tr class="L1" style="display:none;">
+<td>&nbsp;</td>
+<td><code>net.  86400 IN  RRSIG ( DS 8 1 86400 20190904170000 20190822160000 59944 .
+  vHsLFJ6AM1ikgAfIjrzqaYNp0YPPq7z7Rw0walZ++n1z1JUUk5d0qev0vkGQ9UusgyvSoAag3G3n
+  iw7USxHf/Id/adR/UJTJXHEW/dsVz7FGLrpMWGukWcGccA/Xzl+IUl8HRmowV47Ve8Y7Ibsmt6+I
+  5zHDeuTb7LSphXx76uQTploK+oPTYuoDBUPfNqcQc6XUJXaU1gx4WM0QQQTjoDpRkGu5p74ST9K/
+  ASQnD8GMkXHC7kFp3EzJ9JMyKabv0gMqYshsj3m9e6qAKpbNYKA7HycyPonLTg7AucuOmzkIRnyW
+  bHfnk0p6RfkG/KUHUsMxq4KftIVQiTp+Ymq1lw== )</code></td>
+</tr>
+<tr class="L0" style="">
+<td><img style="width:1em;" src="/green.png"  /></td>
+<td>RRSIG<span class="keytag">=59944</span> and DNSKEY<span class="keytag">=59944</span> verifies the DS RRset</td>
+</tr>
+<tr class="L1" style="display:none;">
+<td>&nbsp;</td>
+<td>DS<span class="keytag">=35886/SHA-256</span> is now in the chain-of-trust</td>
+</tr>
+<tr class="L1" style="display:none;">
+<td>&nbsp;</td>
+<td><code>net.  86400 IN  DS  ( 35886 8 2 
+  7862b27f5f516ebe19680444d4ce5e762981931842c465f00236401d8bd973ee )</code></td>
+</tr>
+<tr class="L2" style="display:none;">
+<td>&nbsp;</td>
+<td>Query to j.gtld-servers.net for net/DNSKEY</td>
+</tr>
+<tr class="L2" style="display:none;">
+<td>&nbsp;</td>
+<td>Error querying j.gtld-servers.net/2001:502:7094:0:0:0:0:30 for net/DNSKEY: 'IPv6 transport disabled'</td>
+</tr>
+<tr class="L2" style="display:none;">
+<td>&nbsp;</td>
+<td>Received 921 bytes from 192.48.79.30</td>
+</tr>
+<tr class="L3" style="display:none;">
+<td>&nbsp;</td>
+<td><pre>;; Answer received from 192.48.79.30 (921 bytes)
+;; HEADER SECTION
+;;  id = 49212
+;;  qr = 1  aa = 1  tc = 0  rd = 0  opcode = QUERY
+;;  ra = 0  z  = 0  ad = 0  cd = 0  rcode  = NOERROR
+;;  qdcount = 1 ancount = 4 nscount = 0 arcount = 1
+;;  do = 1
+;; EDNS version 0
+;;  flags:  8000
+;;  rcode:  NOERROR
+;;  size: 4096
+;;  option: 
+
+;; QUESTION SECTION (1 record)
+;; net. IN  DNSKEY
+
+;; ANSWER SECTION (4 records)
+net.  86400 IN  DNSKEY  ( 257 3 8
+  AQOYBnzqWXIEj6mlgXg4LWC0HP2n8eK8XqgHlmJ/69iuIHsa1TrHDG6TcOra/pyeGKwH0nKZhTmX
+  SuUFGh9BCNiwVDuyyb6OBGy2Nte9Kr8NwWg4q+zhSoOf4D+gC9dEzg0yFdwT0DKEvmNPt0K4jbQD
+  S4Yimb+uPKuF6yieWWrPYYCrv8C9KC8JMze2uT6NuWBfsl2fDUoV4l65qMww06D7n+p7RbdwWkAZ
+  0fA63mXVXBZF6kpDtsYD7SUB9jhhfLQE/r85bvg3FaSs5Wi2BaqN06SzGWI1DHu7axthIOeHwg00
+  zxlhTpoYCH0ldoQz+S65zWYi/fRJiyLSBb6JZOvn ) ; Key ID = 35886
+net.  86400 IN  DNSKEY  ( 256 3 8
+  AQPB6mADOfWU6hTegl+pTl1wtjTll+ZnWIuRb8+cU9XNWNPpc3mX+rUqPeiw0RpKkD4QkTqTefWj
+  MqjXMvYn2TxX4V4FMQXYMJr0bgiZXGosA9C9Aa7RgYyt4GJCToXqlM+mTqBjXDkh7yBa8I2X3p6T
+  t/PoKhiqCtmNl6sggTanJw== ) ; Key ID = 2129
+net.  86400 IN  DNSKEY  ( 256 3 8
+  AQPFatGYYq6lmu+wGZlm199qhiLT+qjHuz8Az2coMrhZjXdltPEwtF8PNzJ9clvP4ydyHRhrH62Q
+  rWbTkpu1Uk3WN3KZ814QoYIQCZdO3sQJ8iwchhvgOE4WKtQzt1LtEfQteXc+Vm0Ccnwog+zhKvMQ
+  NpPuRA9AhWGVJ2XGyNJk1oe6bO+Z30ICoRUiFQo3CZqoAebXgJUJBhXxNncvHWan )
+  ; Key ID = 59540
+net.  86400 IN  RRSIG ( DNSKEY 8 1 86400 20190902162830 20190818162330 35886 net.
+  A2fHEChteU7OT/Yl6GY/2qqXypXjvk9l18lbGZCkwrJ0T4f1EF2ZO3yo+3dN3hy6sLE4ECOXyueI
+  GeE9XQsaGZ4Hs2OmdcrXw71h7Eh1vf/hoyHVvoFp7TOXK19qAGf2b8aT1bbaRKOo4uAupkL1LT5o
+  a7nvreoNE7NAofN7Lv7PPkgPBSsTjiU302xCBm510OrskQMS5Vf+iH6GNITle5MtWKkDVhqeMSwF
+  1GbNGaMNAg8H7/1TBh25htbgAWsYxyyzyxLe9dmObjddPTRlGOqaxov6QFL665kCupg1eH9zfbkb
+  GOtmS21VA6nTyVP+1qhTST700J/FZMWcnJROvA== )
+
+;; AUTHORITY SECTION (0 records)
+
+;; ADDITIONAL SECTION (1 record)
+;; EDNS version 0
+;;  flags:  8000
+;;  rcode:  NOERROR
+;;  size: 4096
+;;  option: 
+
+
+</pre></td>
+</tr>
+<tr class="L0" style="">
+<td><img style="width:1em;" src="/green.png"  /></td>
+<td>Found 3 DNSKEY records for net</td>
+</tr>
+<tr class="L1" style="display:none;">
+<td>&nbsp;</td>
+<td><code>net.  86400 IN  DNSKEY  ( 257 3 8
+  AQOYBnzqWXIEj6mlgXg4LWC0HP2n8eK8XqgHlmJ/69iuIHsa1TrHDG6TcOra/pyeGKwH0nKZhTmX
+  SuUFGh9BCNiwVDuyyb6OBGy2Nte9Kr8NwWg4q+zhSoOf4D+gC9dEzg0yFdwT0DKEvmNPt0K4jbQD
+  S4Yimb+uPKuF6yieWWrPYYCrv8C9KC8JMze2uT6NuWBfsl2fDUoV4l65qMww06D7n+p7RbdwWkAZ
+  0fA63mXVXBZF6kpDtsYD7SUB9jhhfLQE/r85bvg3FaSs5Wi2BaqN06SzGWI1DHu7axthIOeHwg00
+  zxlhTpoYCH0ldoQz+S65zWYi/fRJiyLSBb6JZOvn ) ; Key ID = 35886</code></td>
+</tr>
+<tr class="L1" style="display:none;">
+<td>&nbsp;</td>
+<td><code>net.  86400 IN  DNSKEY  ( 256 3 8
+  AQPB6mADOfWU6hTegl+pTl1wtjTll+ZnWIuRb8+cU9XNWNPpc3mX+rUqPeiw0RpKkD4QkTqTefWj
+  MqjXMvYn2TxX4V4FMQXYMJr0bgiZXGosA9C9Aa7RgYyt4GJCToXqlM+mTqBjXDkh7yBa8I2X3p6T
+  t/PoKhiqCtmNl6sggTanJw== ) ; Key ID = 2129</code></td>
+</tr>
+<tr class="L1" style="display:none;">
+<td>&nbsp;</td>
+<td><code>net.  86400 IN  DNSKEY  ( 256 3 8
+  AQPFatGYYq6lmu+wGZlm199qhiLT+qjHuz8Az2coMrhZjXdltPEwtF8PNzJ9clvP4ydyHRhrH62Q
+  rWbTkpu1Uk3WN3KZ814QoYIQCZdO3sQJ8iwchhvgOE4WKtQzt1LtEfQteXc+Vm0Ccnwog+zhKvMQ
+  NpPuRA9AhWGVJ2XGyNJk1oe6bO+Z30ICoRUiFQo3CZqoAebXgJUJBhXxNncvHWan )
+  ; Key ID = 59540</code></td>
+</tr>
+<tr class="L1" style="display:none;">
+<td>&nbsp;</td>
+<td>DNSKEY<span class="keytag">=35886/SEP</span> is now in the chain-of-trust</td>
+</tr>
+<tr class="L0" style="">
+<td><img style="width:1em;" src="/green.png"  /></td>
+<td>DS<span class="keytag">=35886/SHA-256</span> verifies DNSKEY<span class="keytag">=35886/SEP</span></td>
+</tr>
+<tr class="L0" style="">
+<td><img style="width:1em;" src="/green.png"  /></td>
+<td>Found 1 RRSIGs over DNSKEY RRset</td>
+</tr>
+<tr class="L1" style="display:none;">
+<td>&nbsp;</td>
+<td><code>net.  86400 IN  RRSIG ( DNSKEY 8 1 86400 20190902162830 20190818162330 35886 net.
+  A2fHEChteU7OT/Yl6GY/2qqXypXjvk9l18lbGZCkwrJ0T4f1EF2ZO3yo+3dN3hy6sLE4ECOXyueI
+  GeE9XQsaGZ4Hs2OmdcrXw71h7Eh1vf/hoyHVvoFp7TOXK19qAGf2b8aT1bbaRKOo4uAupkL1LT5o
+  a7nvreoNE7NAofN7Lv7PPkgPBSsTjiU302xCBm510OrskQMS5Vf+iH6GNITle5MtWKkDVhqeMSwF
+  1GbNGaMNAg8H7/1TBh25htbgAWsYxyyzyxLe9dmObjddPTRlGOqaxov6QFL665kCupg1eH9zfbkb
+  GOtmS21VA6nTyVP+1qhTST700J/FZMWcnJROvA== )</code></td>
+</tr>
+<tr class="L0" style="">
+<td><img style="width:1em;" src="/green.png"  /></td>
+<td>RRSIG<span class="keytag">=35886</span> and DNSKEY<span class="keytag">=35886/SEP</span> verifies the DNSKEY RRset</td>
+</tr>
+<tr class="L1" style="display:none;">
+<td>&nbsp;</td>
+<td>DNSKEY<span class="keytag">=2129</span> is now in the chain-of-trust</td>
+</tr>
+<tr class="L1" style="display:none;">
+<td>&nbsp;</td>
+<td>DNSKEY<span class="keytag">=59540</span> is now in the chain-of-trust</td>
+</tr>
+<tr class="L2" style="display:none;">
+<td>&nbsp;</td>
+<td>Query to i.gtld-servers.net for stalkr.net/A</td>
+</tr>
+<tr class="L2" style="display:none;">
+<td>&nbsp;</td>
+<td>Error querying i.gtld-servers.net/2001:503:39c1:0:0:0:0:30 for stalkr.net/A: 'IPv6 transport disabled'</td>
+</tr>
+<tr class="L2" style="display:none;">
+<td>&nbsp;</td>
+<td>Received 721 bytes from 192.43.172.30</td>
+</tr>
+<tr class="L3" style="display:none;">
+<td>&nbsp;</td>
+<td><pre>;; Answer received from 192.43.172.30 (721 bytes)
+;; HEADER SECTION
+;;  id = 29345
+;;  qr = 1  aa = 0  tc = 0  rd = 0  opcode = QUERY
+;;  ra = 0  z  = 0  ad = 0  cd = 0  rcode  = NOERROR
+;;  qdcount = 1 ancount = 0 nscount = 8 arcount = 3
+;;  do = 1
+;; EDNS version 0
+;;  flags:  8000
+;;  rcode:  NOERROR
+;;  size: 4096
+;;  option: 
+
+;; QUESTION SECTION (1 record)
+;; stalkr.net.  IN  A
+
+;; ANSWER SECTION (0 records)
+
+;; AUTHORITY SECTION (8 records)
+stalkr.net. 172800  IN  NS  ns2.afraid.org.
+stalkr.net. 172800  IN  NS  ns0.1984.is.
+stalkr.net. 172800  IN  NS  ns1.1984.is.
+stalkr.net. 172800  IN  NS  ns0.stalkr.net.
+A1RT98BS5QGC9NFI51S9HCI47ULJG6JH.net. 86400 IN  NSEC3 ( 1 1 0 -
+  a1ruuffjkct2q54p78f8ejgj8jbk7i8b NS SOA RRSIG DNSKEY NSEC3PARAM )
+A1RT98BS5QGC9NFI51S9HCI47ULJG6JH.net. 86400 IN  RRSIG ( NSEC3 8 2 86400
+  20190827060114 20190820045114 59540 net.
+  ArekvM+vNQJ6bD1obxHlylslcobGFMP8a+59Btg+H6hx8996Vm5vdmWkCPLDuiwdR7/ybEDCd1G0
+  COY7VVjU+C1FccHTXm1s1BkSJHOYzWO2twN0FPx9NIoQWh0BaSAf00PlnxHpweZNflMDCE0AlQM3
+  NXPz+jdvJIVtTZh02KwGziShiJa54VLzcb511YfeAvHfWDI32J6gPCWdUKNq3g== )
+D86V3T6G1NGBNQF99PQQDQPPL4LF96DG.net. 86400 IN  NSEC3 ( 1 1 0 -
+  d872j0gcn57a2b1e399148dadd60emad NS DS RRSIG )
+D86V3T6G1NGBNQF99PQQDQPPL4LF96DG.net. 86400 IN  RRSIG ( NSEC3 8 2 86400
+  20190829101622 20190822090622 59540 net.
+  qeiw07GKCrdsgnsdtA4lcMxRbWMaycguXB0yb8svsNDawd8zOaGvkqcJy3JlLR4D1b6bxxH7hNUm
+  TzJFGfBHstqSV5t1LTMgjgbki+tYP7cZW60FJ6VUNqDVSyvVILkx0SAa3PTPtrZdSRuPct8mTEnF
+  fgT2hysoyThJZynm2IuvHIIg0Rz49gIwCDmTPE4EzO/++4Di6Uh4+9js6fBEiQ== )
+
+;; ADDITIONAL SECTION (3 records)
+ns0.stalkr.net. 172800  IN  AAAA  2001:41d0:403:1830:55::1
+ns0.stalkr.net. 172800  IN  A 51.38.54.48
+;; EDNS version 0
+;;  flags:  8000
+;;  rcode:  NOERROR
+;;  size: 4096
+;;  option: 
+
+
+</pre></td>
+</tr>
+<tr class="L2" style="display:none;">
+<td>&nbsp;</td>
+<td>Query to k.gtld-servers.net for stalkr.net/DNSKEY</td>
+</tr>
+<tr class="L2" style="display:none;">
+<td>&nbsp;</td>
+<td>Received 721 bytes from 192.52.178.30</td>
+</tr>
+<tr class="L3" style="display:none;">
+<td>&nbsp;</td>
+<td><pre>;; Answer received from 192.52.178.30 (721 bytes)
+;; HEADER SECTION
+;;  id = 599
+;;  qr = 1  aa = 0  tc = 0  rd = 0  opcode = QUERY
+;;  ra = 0  z  = 0  ad = 0  cd = 0  rcode  = NOERROR
+;;  qdcount = 1 ancount = 0 nscount = 8 arcount = 3
+;;  do = 1
+;; EDNS version 0
+;;  flags:  8000
+;;  rcode:  NOERROR
+;;  size: 4096
+;;  option: 
+
+;; QUESTION SECTION (1 record)
+;; stalkr.net.  IN  DNSKEY
+
+;; ANSWER SECTION (0 records)
+
+;; AUTHORITY SECTION (8 records)
+stalkr.net. 172800  IN  NS  ns2.afraid.org.
+stalkr.net. 172800  IN  NS  ns0.1984.is.
+stalkr.net. 172800  IN  NS  ns1.1984.is.
+stalkr.net. 172800  IN  NS  ns0.stalkr.net.
+A1RT98BS5QGC9NFI51S9HCI47ULJG6JH.net. 86400 IN  NSEC3 ( 1 1 0 -
+  a1ruuffjkct2q54p78f8ejgj8jbk7i8b NS SOA RRSIG DNSKEY NSEC3PARAM )
+A1RT98BS5QGC9NFI51S9HCI47ULJG6JH.net. 86400 IN  RRSIG ( NSEC3 8 2 86400
+  20190827060114 20190820045114 59540 net.
+  ArekvM+vNQJ6bD1obxHlylslcobGFMP8a+59Btg+H6hx8996Vm5vdmWkCPLDuiwdR7/ybEDCd1G0
+  COY7VVjU+C1FccHTXm1s1BkSJHOYzWO2twN0FPx9NIoQWh0BaSAf00PlnxHpweZNflMDCE0AlQM3
+  NXPz+jdvJIVtTZh02KwGziShiJa54VLzcb511YfeAvHfWDI32J6gPCWdUKNq3g== )
+D86V3T6G1NGBNQF99PQQDQPPL4LF96DG.net. 86400 IN  NSEC3 ( 1 1 0 -
+  d872j0gcn57a2b1e399148dadd60emad NS DS RRSIG )
+D86V3T6G1NGBNQF99PQQDQPPL4LF96DG.net. 86400 IN  RRSIG ( NSEC3 8 2 86400
+  20190829101622 20190822090622 59540 net.
+  qeiw07GKCrdsgnsdtA4lcMxRbWMaycguXB0yb8svsNDawd8zOaGvkqcJy3JlLR4D1b6bxxH7hNUm
+  TzJFGfBHstqSV5t1LTMgjgbki+tYP7cZW60FJ6VUNqDVSyvVILkx0SAa3PTPtrZdSRuPct8mTEnF
+  fgT2hysoyThJZynm2IuvHIIg0Rz49gIwCDmTPE4EzO/++4Di6Uh4+9js6fBEiQ== )
+
+;; ADDITIONAL SECTION (3 records)
+ns0.stalkr.net. 172800  IN  AAAA  2001:41d0:403:1830:55::1
+ns0.stalkr.net. 172800  IN  A 51.38.54.48
+;; EDNS version 0
+;;  flags:  8000
+;;  rcode:  NOERROR
+;;  size: 4096
+;;  option: 
+
+
+</pre></td>
+</tr>
+<tr class="L1" style="display:none;">
+<td>&nbsp;</td>
+<td>Found child zone stalkr.net</td>
+</tr>
+</TABLE>
+</TD>
+</TR>
+<TR>
+<TD CLASS="T1L">stalkr.net</TD>
+<TD>
+<TABLE CLASS="T2">
+<tr class="L1" style="display:none;">
+<td>&nbsp;</td>
+<td>Checking DS between net and stalkr.net</td>
+</tr>
+<tr class="L2" style="display:none;">
+<td>&nbsp;</td>
+<td>Query to a.gtld-servers.net for stalkr.net/DS</td>
+</tr>
+<tr class="L2" style="display:none;">
+<td>&nbsp;</td>
+<td>Error querying a.gtld-servers.net/2001:503:a83e:0:0:0:2:30 for stalkr.net/DS: 'IPv6 transport disabled'</td>
+</tr>
+<tr class="L2" style="display:none;">
+<td>&nbsp;</td>
+<td>Received 856 bytes from 192.5.6.30</td>
+</tr>
+<tr class="L3" style="display:none;">
+<td>&nbsp;</td>
+<td><pre>;; Answer received from 192.5.6.30 (856 bytes)
+;; HEADER SECTION
+;;  id = 65427
+;;  qr = 1  aa = 1  tc = 0  rd = 0  opcode = QUERY
+;;  ra = 0  z  = 0  ad = 0  cd = 0  rcode  = NOERROR
+;;  qdcount = 1 ancount = 0 nscount = 6 arcount = 1
+;;  do = 1
+;; EDNS version 0
+;;  flags:  8000
+;;  rcode:  NOERROR
+;;  size: 4096
+;;  option: 
+
+;; QUESTION SECTION (1 record)
+;; stalkr.net.  IN  DS
+
+;; ANSWER SECTION (0 records)
+
+;; AUTHORITY SECTION (6 records)
+A1RT98BS5QGC9NFI51S9HCI47ULJG6JH.net. 86400 IN  NSEC3 ( 1 1 0 -
+  a1ruuffjkct2q54p78f8ejgj8jbk7i8b NS SOA RRSIG DNSKEY NSEC3PARAM )
+A1RT98BS5QGC9NFI51S9HCI47ULJG6JH.net. 86400 IN  RRSIG ( NSEC3 8 2 86400
+  20190827060114 20190820045114 59540 net.
+  ArekvM+vNQJ6bD1obxHlylslcobGFMP8a+59Btg+H6hx8996Vm5vdmWkCPLDuiwdR7/ybEDCd1G0
+  COY7VVjU+C1FccHTXm1s1BkSJHOYzWO2twN0FPx9NIoQWh0BaSAf00PlnxHpweZNflMDCE0AlQM3
+  NXPz+jdvJIVtTZh02KwGziShiJa54VLzcb511YfeAvHfWDI32J6gPCWdUKNq3g== )
+net.  900 IN  SOA ( a.gtld-servers.net. nstld.verisign-grs.com.
+        1566508845  ;serial
+        1800    ;refresh
+        900   ;retry
+        604800    ;expire
+        86400   ;minimum
+  )
+net.  900 IN  RRSIG ( SOA 8 1 900 20190829212045 20190822201045 59540 net.
+  W1Dh0LxUEVFe0vjNKUGQueeRarIx87dPoXJ/2erpaty32uVcBV4IQ2gAcDMsJ82zs6gF6NZIv5C5
+  QL8pNIS8RevGn6P/60dTo1MsnbcfunWTHXJqo07xxgeF9unMwjeujFU2MznKjQ9wdVBgNAff/2If
+  m8YrDYgbEcTadroOdsCzw4EGtQxoy8ntcx3zNs1KowcL3eXxFHZAGc+9KlwiBQ== )
+D86V3T6G1NGBNQF99PQQDQPPL4LF96DG.net. 86400 IN  NSEC3 ( 1 1 0 -
+  d872j0gcn57a2b1e399148dadd60emad NS DS RRSIG )
+D86V3T6G1NGBNQF99PQQDQPPL4LF96DG.net. 86400 IN  RRSIG ( NSEC3 8 2 86400
+  20190829101622 20190822090622 59540 net.
+  qeiw07GKCrdsgnsdtA4lcMxRbWMaycguXB0yb8svsNDawd8zOaGvkqcJy3JlLR4D1b6bxxH7hNUm
+  TzJFGfBHstqSV5t1LTMgjgbki+tYP7cZW60FJ6VUNqDVSyvVILkx0SAa3PTPtrZdSRuPct8mTEnF
+  fgT2hysoyThJZynm2IuvHIIg0Rz49gIwCDmTPE4EzO/++4Di6Uh4+9js6fBEiQ== )
+
+;; ADDITIONAL SECTION (1 record)
+;; EDNS version 0
+;;  flags:  8000
+;;  rcode:  NOERROR
+;;  size: 4096
+;;  option: 
+
+
+</pre></td>
+</tr>
+<tr class="L0" style="" id="no-ds-in-parent-stalkr.net">
+<td><img style="width:1em;" src="/red.png" onmouseover="tooltip.show('<p>The parent zone data should include DS records for the child zone.</p> <p>To remedy, the signer of the <u>stalkr.net</u> zone should send the current DS records to the <u>net</u> zone.</p> ')" onmouseout="tooltip.hide()" /></td>
+<td>No DS records found for stalkr.net in the net zone</td>
+</tr>
+<script>var row = document.getElementById('no-ds-in-referral-net');row.parentNode.removeChild(row);</script>
+<tr class="L2" style="display:none;">
+<td>&nbsp;</td>
+<td>Query to ns1.1984.is for stalkr.net/DNSKEY</td>
+</tr>
+<tr class="L2" style="display:none;">
+<td>&nbsp;</td>
+<td>Received 225 bytes from 45.76.136.88</td>
+</tr>
+<tr class="L3" style="display:none;">
+<td>&nbsp;</td>
+<td><pre>;; Answer received from 45.76.136.88 (225 bytes)
+;; HEADER SECTION
+;;  id = 7520
+;;  qr = 1  aa = 1  tc = 0  rd = 0  opcode = QUERY
+;;  ra = 0  z  = 0  ad = 0  cd = 0  rcode  = NOERROR
+;;  qdcount = 1 ancount = 2 nscount = 0 arcount = 1
+;;  do = 1
+;; EDNS version 0
+;;  flags:  8000
+;;  rcode:  NOERROR
+;;  size: 4096
+;;  option: 
+
+;; QUESTION SECTION (1 record)
+;; stalkr.net.  IN  DNSKEY
+
+;; ANSWER SECTION (2 records)
+stalkr.net. 86400 IN  DNSKEY  ( 257 3 13
+  SguxzdV2I3Q/uKBK/v+tbaiOdVuMVx4QngE6Ji2CwReerpBosEUA8ut7y4pQZY6/Iv/h1mC7qh8I
+  qjcZtu90Hg== ) ; Key ID = 1363
+stalkr.net. 86400 IN  RRSIG ( DNSKEY 13 2 86400 20190905000000 20190815000000
+  1363 stalkr.net.
+  EvAYgRwqDuKNiSrsUEtFz49WhefmUJzadZk0+m4tHlERl10SxOhG1Gp0y/RWy4vChTLPpzq1XdD+
+  BNkYU9RzsQ== )
+
+;; AUTHORITY SECTION (0 records)
+
+;; ADDITIONAL SECTION (1 record)
+;; EDNS version 0
+;;  flags:  8000
+;;  rcode:  NOERROR
+;;  size: 4096
+;;  option: 
+
+
+</pre></td>
+</tr>
+<tr class="L0" style="">
+<td><img style="width:1em;" src="/green.png"  /></td>
+<td>Found 1 DNSKEY records for stalkr.net</td>
+</tr>
+<tr class="L1" style="display:none;">
+<td>&nbsp;</td>
+<td><code>stalkr.net. 86400 IN  DNSKEY  ( 257 3 13
+  SguxzdV2I3Q/uKBK/v+tbaiOdVuMVx4QngE6Ji2CwReerpBosEUA8ut7y4pQZY6/Iv/h1mC7qh8I
+  qjcZtu90Hg== ) ; Key ID = 1363</code></td>
+</tr>
+<tr class="L0" style="">
+<td><img style="width:1em;" src="/green.png"  /></td>
+<td>Found 1 RRSIGs over DNSKEY RRset</td>
+</tr>
+<tr class="L1" style="display:none;">
+<td>&nbsp;</td>
+<td><code>stalkr.net. 86400 IN  RRSIG ( DNSKEY 13 2 86400 20190905000000 20190815000000
+  1363 stalkr.net.
+  EvAYgRwqDuKNiSrsUEtFz49WhefmUJzadZk0+m4tHlERl10SxOhG1Gp0y/RWy4vChTLPpzq1XdD+
+  BNkYU9RzsQ== )</code></td>
+</tr>
+<tr class="L0" style="">
+<td><img style="width:1em;" src="/green.png"  /></td>
+<td>RRSIG<span class="keytag">=1363</span> and DNSKEY<span class="keytag">=1363/SEP</span> verifies the DNSKEY RRset</td>
+</tr>
+<tr class="L2" style="display:none;">
+<td>&nbsp;</td>
+<td>Query to ns0.stalkr.net for stalkr.net/A</td>
+</tr>
+<tr class="L2" style="display:none;">
+<td>&nbsp;</td>
+<td>Error querying ns0.stalkr.net/2001:41d0:403:1830:55:0:0:1 for stalkr.net/A: 'IPv6 transport disabled'</td>
+</tr>
+<tr class="L2" style="display:none;">
+<td>&nbsp;</td>
+<td>Received 181 bytes from 51.38.54.48</td>
+</tr>
+<tr class="L3" style="display:none;">
+<td>&nbsp;</td>
+<td><pre>;; Answer received from 51.38.54.48 (181 bytes)
+;; HEADER SECTION
+;;  id = 1915
+;;  qr = 1  aa = 1  tc = 0  rd = 0  opcode = QUERY
+;;  ra = 0  z  = 0  ad = 0  cd = 0  rcode  = NOERROR
+;;  qdcount = 1 ancount = 2 nscount = 0 arcount = 1
+;;  do = 1
+;; EDNS version 0
+;;  flags:  8000
+;;  rcode:  NOERROR
+;;  size: 1680
+;;  option: 
+
+;; QUESTION SECTION (1 record)
+;; stalkr.net.  IN  A
+
+;; ANSWER SECTION (2 records)
+stalkr.net. 3600  IN  A 51.38.54.48
+stalkr.net. 3600  IN  RRSIG ( A 13 2 3600 20190905000000 20190815000000 1363
+  stalkr.net.
+  A7xz5hvbrpsgV0nC0oX5oX3vJzTj8QLs4FlcixMypItihA6poXkzKD02p6GSJ9++k91twH2vMAGP
+  KjjxxRGlnQ== )
+
+;; AUTHORITY SECTION (0 records)
+
+;; ADDITIONAL SECTION (1 record)
+;; EDNS version 0
+;;  flags:  8000
+;;  rcode:  NOERROR
+;;  size: 1680
+;;  option: 
+
+
+</pre></td>
+</tr>
+<tr class="L1" style="display:none;">
+<td>&nbsp;</td>
+<td>stalkr.net is authoritative for stalkr.net</td>
+</tr>
+<tr class="L2" style="display:none;">
+<td>&nbsp;</td>
+<td>Found RRSIG signed by stalkr.net zone</td>
+</tr>
+<tr class="L2" style="display:none;">
+<td>&nbsp;</td>
+<td>Query to ns2.afraid.org for stalkr.net/SOA</td>
+</tr>
+<tr class="L2" style="display:none;">
+<td>&nbsp;</td>
+<td>Received 705 bytes from 69.65.50.223</td>
+</tr>
+<tr class="L3" style="display:none;">
+<td>&nbsp;</td>
+<td><pre>;; Answer received from 69.65.50.223 (705 bytes)
+;; HEADER SECTION
+;;  id = 42615
+;;  qr = 1  aa = 1  tc = 0  rd = 0  opcode = QUERY
+;;  ra = 0  z  = 0  ad = 0  cd = 0  rcode  = NOERROR
+;;  qdcount = 1 ancount = 2 nscount = 6 arcount = 7
+;;  do = 1
+;; EDNS version 0
+;;  flags:  8000
+;;  rcode:  NOERROR
+;;  size: 1220
+;;  option: 
+
+;; QUESTION SECTION (1 record)
+;; stalkr.net.  IN  SOA
+
+;; ANSWER SECTION (2 records)
+stalkr.net. 3600  IN  SOA ( ns0.stalkr.net. hostmaster.stalkr.net.
+        2019082200  ;serial
+        14400   ;refresh
+        3600    ;retry
+        604800    ;expire
+        86400   ;minimum
+  )
+stalkr.net. 3600  IN  RRSIG ( SOA 13 2 3600 20190905000000 20190815000000 1363
+  stalkr.net.
+  K+jsy2UE6qDHM9U3naLU8wl9aZroednWDxUocClgcm9fCqwAvHjKwhCQnIOhK78TQuVRz48g0xli
+  naAQl7Pn0A== )
+
+;; AUTHORITY SECTION (6 records)
+stalkr.net. 86400 IN  NS  ns0.stalkr.net.
+stalkr.net. 86400 IN  NS  ns0.1984.is.
+stalkr.net. 86400 IN  NS  ns2.1984.is.
+stalkr.net. 86400 IN  NS  ns1.1984.is.
+stalkr.net. 86400 IN  NS  ns2.afraid.org.
+stalkr.net. 86400 IN  RRSIG ( NS 13 2 86400 20190905000000 20190815000000 1363
+  stalkr.net.
+  8Le8c0F/BuwhX2IL7Ut33QJGC1oSsEZhG0Gh14CmpqrLs1s2Jo1gD5kCyR7qjRGj6AgdbrbGRi8h
+  bQZuOUJ4OA== )
+
+;; ADDITIONAL SECTION (7 records)
+ns0.stalkr.net. 86400 IN  A 51.38.54.48
+ns2.afraid.org. 300 IN  A 69.65.50.223
+ns0.stalkr.net. 86400 IN  AAAA  2001:41d0:403:1830:55::1
+ns2.afraid.org. 300 IN  AAAA  2001:1850:1:5:800::6b
+ns0.stalkr.net. 86400 IN  RRSIG ( A 13 3 86400 20190905000000 20190815000000
+  1363 stalkr.net.
+  /Cviw3InAPmVQFARQ+0qkO9EQnxRla5Im8focmkmfW4EbSLztAFH4iR0/Pgx+JdKSUZ4C2Yz5+EL
+  6os8+hYdPw== )
+ns0.stalkr.net. 86400 IN  RRSIG ( AAAA 13 3 86400 20190905000000 20190815000000
+  1363 stalkr.net.
+  QvqubGfn7oe1Dv5iPRvFi1Pp6IImW0iLD/DO/ajSNDxg72wdPPaHj9rsLY7PkGAaquUIbOjKF3bE
+  TgegYNN9+w== )
+;; EDNS version 0
+;;  flags:  8000
+;;  rcode:  NOERROR
+;;  size: 1220
+;;  option: 
+
+
+</pre></td>
+</tr>
+<tr class="L2" style="display:none;">
+<td>&nbsp;</td>
+<td>Query to ns0.1984.is for stalkr.net/SOA</td>
+</tr>
+<tr class="L2" style="display:none;">
+<td>&nbsp;</td>
+<td>Received 797 bytes from 45.76.37.222</td>
+</tr>
+<tr class="L3" style="display:none;">
+<td>&nbsp;</td>
+<td><pre>;; Answer received from 45.76.37.222 (797 bytes)
+;; HEADER SECTION
+;;  id = 13847
+;;  qr = 1  aa = 1  tc = 0  rd = 0  opcode = QUERY
+;;  ra = 0  z  = 0  ad = 0  cd = 0  rcode  = NOERROR
+;;  qdcount = 1 ancount = 2 nscount = 6 arcount = 12
+;;  do = 1
+;; EDNS version 0
+;;  flags:  8000
+;;  rcode:  NOERROR
+;;  size: 4096
+;;  option: 
+
+;; QUESTION SECTION (1 record)
+;; stalkr.net.  IN  SOA
+
+;; ANSWER SECTION (2 records)
+stalkr.net. 3600  IN  SOA ( ns0.stalkr.net. hostmaster.stalkr.net.
+        2019082200  ;serial
+        14400   ;refresh
+        3600    ;retry
+        604800    ;expire
+        86400   ;minimum
+  )
+stalkr.net. 3600  IN  RRSIG ( SOA 13 2 3600 20190905000000 20190815000000 1363
+  stalkr.net.
+  K+jsy2UE6qDHM9U3naLU8wl9aZroednWDxUocClgcm9fCqwAvHjKwhCQnIOhK78TQuVRz48g0xli
+  naAQl7Pn0A== )
+
+;; AUTHORITY SECTION (6 records)
+stalkr.net. 86400 IN  NS  ns0.1984.is.
+stalkr.net. 86400 IN  NS  ns2.1984.is.
+stalkr.net. 86400 IN  NS  ns1.1984.is.
+stalkr.net. 86400 IN  NS  ns2.afraid.org.
+stalkr.net. 86400 IN  NS  ns0.stalkr.net.
+stalkr.net. 86400 IN  RRSIG ( NS 13 2 86400 20190905000000 20190815000000 1363
+  stalkr.net.
+  8Le8c0F/BuwhX2IL7Ut33QJGC1oSsEZhG0Gh14CmpqrLs1s2Jo1gD5kCyR7qjRGj6AgdbrbGRi8h
+  bQZuOUJ4OA== )
+
+;; ADDITIONAL SECTION (12 records)
+ns0.1984.is.  300 IN  A 45.76.37.222
+ns0.1984.is.  300 IN  A 185.112.145.12
+ns0.1984.is.  300 IN  AAAA  2001:19f0:5001:185a:5400:ff:fe50:56d5
+ns0.stalkr.net. 86400 IN  A 51.38.54.48
+ns0.stalkr.net. 86400 IN  AAAA  2001:41d0:403:1830:55::1
+ns1.1984.is.  300 IN  A 45.76.136.88
+ns1.1984.is.  300 IN  AAAA  2001:19f0:7402:1f6:5400:ff:fe50:5658
+ns2.1984.is.  300 IN  A 93.95.226.52
+ns2.1984.is.  300 IN  A 45.32.180.186
+ns0.stalkr.net. 86400 IN  RRSIG ( A 13 3 86400 20190905000000 20190815000000
+  1363 stalkr.net.
+  /Cviw3InAPmVQFARQ+0qkO9EQnxRla5Im8focmkmfW4EbSLztAFH4iR0/Pgx+JdKSUZ4C2Yz5+EL
+  6os8+hYdPw== )
+ns0.stalkr.net. 86400 IN  RRSIG ( AAAA 13 3 86400 20190905000000 20190815000000
+  1363 stalkr.net.
+  QvqubGfn7oe1Dv5iPRvFi1Pp6IImW0iLD/DO/ajSNDxg72wdPPaHj9rsLY7PkGAaquUIbOjKF3bE
+  TgegYNN9+w== )
+;; EDNS version 0
+;;  flags:  8000
+;;  rcode:  NOERROR
+;;  size: 4096
+;;  option: 
+
+
+</pre></td>
+</tr>
+<tr class="L2" style="display:none;">
+<td>&nbsp;</td>
+<td>Query to ns0.stalkr.net for stalkr.net/SOA</td>
+</tr>
+<tr class="L2" style="display:none;">
+<td>&nbsp;</td>
+<td>Error querying ns0.stalkr.net/2001:41d0:403:1830:55:0:0:1 for stalkr.net/SOA: 'IPv6 transport disabled'</td>
+</tr>
+<tr class="L2" style="display:none;">
+<td>&nbsp;</td>
+<td>Received 236 bytes from 51.38.54.48</td>
+</tr>
+<tr class="L3" style="display:none;">
+<td>&nbsp;</td>
+<td><pre>;; Answer received from 51.38.54.48 (236 bytes)
+;; HEADER SECTION
+;;  id = 23327
+;;  qr = 1  aa = 1  tc = 0  rd = 0  opcode = QUERY
+;;  ra = 0  z  = 0  ad = 0  cd = 0  rcode  = NOERROR
+;;  qdcount = 1 ancount = 2 nscount = 0 arcount = 1
+;;  do = 1
+;; EDNS version 0
+;;  flags:  8000
+;;  rcode:  NOERROR
+;;  size: 1680
+;;  option: 
+
+;; QUESTION SECTION (1 record)
+;; stalkr.net.  IN  SOA
+
+;; ANSWER SECTION (2 records)
+stalkr.net. 3600  IN  SOA ( ns0.stalkr.net. hostmaster.stalkr.net.
+        2019082200  ;serial
+        14400   ;refresh
+        3600    ;retry
+        604800    ;expire
+        86400   ;minimum
+  )
+stalkr.net. 3600  IN  RRSIG ( SOA 13 2 3600 20190905000000 20190815000000 1363
+  stalkr.net.
+  K+jsy2UE6qDHM9U3naLU8wl9aZroednWDxUocClgcm9fCqwAvHjKwhCQnIOhK78TQuVRz48g0xli
+  naAQl7Pn0A== )
+
+;; AUTHORITY SECTION (0 records)
+
+;; ADDITIONAL SECTION (1 record)
+;; EDNS version 0
+;;  flags:  8000
+;;  rcode:  NOERROR
+;;  size: 1680
+;;  option: 
+
+
+</pre></td>
+</tr>
+<tr class="L2" style="display:none;">
+<td>&nbsp;</td>
+<td>Query to ns1.1984.is for stalkr.net/SOA</td>
+</tr>
+<tr class="L2" style="display:none;">
+<td>&nbsp;</td>
+<td>Error querying ns1.1984.is/2001:19f0:7402:1f6:5400:ff:fe50:5658 for stalkr.net/SOA: 'IPv6 transport disabled'</td>
+</tr>
+<tr class="L2" style="display:none;">
+<td>&nbsp;</td>
+<td>Received 797 bytes from 45.76.136.88</td>
+</tr>
+<tr class="L3" style="display:none;">
+<td>&nbsp;</td>
+<td><pre>;; Answer received from 45.76.136.88 (797 bytes)
+;; HEADER SECTION
+;;  id = 57742
+;;  qr = 1  aa = 1  tc = 0  rd = 0  opcode = QUERY
+;;  ra = 0  z  = 0  ad = 0  cd = 0  rcode  = NOERROR
+;;  qdcount = 1 ancount = 2 nscount = 6 arcount = 12
+;;  do = 1
+;; EDNS version 0
+;;  flags:  8000
+;;  rcode:  NOERROR
+;;  size: 4096
+;;  option: 
+
+;; QUESTION SECTION (1 record)
+;; stalkr.net.  IN  SOA
+
+;; ANSWER SECTION (2 records)
+stalkr.net. 3600  IN  SOA ( ns0.stalkr.net. hostmaster.stalkr.net.
+        2019082200  ;serial
+        14400   ;refresh
+        3600    ;retry
+        604800    ;expire
+        86400   ;minimum
+  )
+stalkr.net. 3600  IN  RRSIG ( SOA 13 2 3600 20190905000000 20190815000000 1363
+  stalkr.net.
+  K+jsy2UE6qDHM9U3naLU8wl9aZroednWDxUocClgcm9fCqwAvHjKwhCQnIOhK78TQuVRz48g0xli
+  naAQl7Pn0A== )
+
+;; AUTHORITY SECTION (6 records)
+stalkr.net. 86400 IN  NS  ns2.1984.is.
+stalkr.net. 86400 IN  NS  ns0.stalkr.net.
+stalkr.net. 86400 IN  NS  ns2.afraid.org.
+stalkr.net. 86400 IN  NS  ns0.1984.is.
+stalkr.net. 86400 IN  NS  ns1.1984.is.
+stalkr.net. 86400 IN  RRSIG ( NS 13 2 86400 20190905000000 20190815000000 1363
+  stalkr.net.
+  8Le8c0F/BuwhX2IL7Ut33QJGC1oSsEZhG0Gh14CmpqrLs1s2Jo1gD5kCyR7qjRGj6AgdbrbGRi8h
+  bQZuOUJ4OA== )
+
+;; ADDITIONAL SECTION (12 records)
+ns0.1984.is.  300 IN  A 185.112.145.12
+ns0.1984.is.  300 IN  A 45.76.37.222
+ns0.1984.is.  300 IN  AAAA  2001:19f0:5001:185a:5400:ff:fe50:56d5
+ns0.stalkr.net. 86400 IN  A 51.38.54.48
+ns0.stalkr.net. 86400 IN  AAAA  2001:41d0:403:1830:55::1
+ns1.1984.is.  300 IN  A 45.76.136.88
+ns1.1984.is.  300 IN  AAAA  2001:19f0:7402:1f6:5400:ff:fe50:5658
+ns2.1984.is.  300 IN  A 93.95.226.52
+ns2.1984.is.  300 IN  A 45.32.180.186
+ns0.stalkr.net. 86400 IN  RRSIG ( A 13 3 86400 20190905000000 20190815000000
+  1363 stalkr.net.
+  /Cviw3InAPmVQFARQ+0qkO9EQnxRla5Im8focmkmfW4EbSLztAFH4iR0/Pgx+JdKSUZ4C2Yz5+EL
+  6os8+hYdPw== )
+ns0.stalkr.net. 86400 IN  RRSIG ( AAAA 13 3 86400 20190905000000 20190815000000
+  1363 stalkr.net.
+  QvqubGfn7oe1Dv5iPRvFi1Pp6IImW0iLD/DO/ajSNDxg72wdPPaHj9rsLY7PkGAaquUIbOjKF3bE
+  TgegYNN9+w== )
+;; EDNS version 0
+;;  flags:  8000
+;;  rcode:  NOERROR
+;;  size: 4096
+;;  option: 
+
+
+</pre></td>
+</tr>
+<tr class="L2" style="display:none;">
+<td>&nbsp;</td>
+<td>Query to ns0.stalkr.net for stalkr.net/A</td>
+</tr>
+<tr class="L2" style="display:none;">
+<td>&nbsp;</td>
+<td>Received 181 bytes from 51.38.54.48</td>
+</tr>
+<tr class="L3" style="display:none;">
+<td>&nbsp;</td>
+<td><pre>;; Answer received from 51.38.54.48 (181 bytes)
+;; HEADER SECTION
+;;  id = 36810
+;;  qr = 1  aa = 1  tc = 0  rd = 0  opcode = QUERY
+;;  ra = 0  z  = 0  ad = 0  cd = 0  rcode  = NOERROR
+;;  qdcount = 1 ancount = 2 nscount = 0 arcount = 1
+;;  do = 1
+;; EDNS version 0
+;;  flags:  8000
+;;  rcode:  NOERROR
+;;  size: 1680
+;;  option: 
+
+;; QUESTION SECTION (1 record)
+;; stalkr.net.  IN  A
+
+;; ANSWER SECTION (2 records)
+stalkr.net. 3600  IN  A 51.38.54.48
+stalkr.net. 3600  IN  RRSIG ( A 13 2 3600 20190905000000 20190815000000 1363
+  stalkr.net.
+  A7xz5hvbrpsgV0nC0oX5oX3vJzTj8QLs4FlcixMypItihA6poXkzKD02p6GSJ9++k91twH2vMAGP
+  KjjxxRGlnQ== )
+
+;; AUTHORITY SECTION (0 records)
+
+;; ADDITIONAL SECTION (1 record)
+;; EDNS version 0
+;;  flags:  8000
+;;  rcode:  NOERROR
+;;  size: 1680
+;;  option: 
+
+
+</pre></td>
+</tr>
+<tr class="L0" style="">
+<td><img style="width:1em;" src="/green.png"  /></td>
+<td>stalkr.net A RR has value 51.38.54.48</td>
+</tr>
+<tr class="L0" style="">
+<td><img style="width:1em;" src="/green.png"  /></td>
+<td>Found 1 RRSIGs over A RRset</td>
+</tr>
+<tr class="L1" style="display:none;">
+<td>&nbsp;</td>
+<td><code>stalkr.net. 3600  IN  RRSIG ( A 13 2 3600 20190905000000 20190815000000 1363
+  stalkr.net.
+  A7xz5hvbrpsgV0nC0oX5oX3vJzTj8QLs4FlcixMypItihA6poXkzKD02p6GSJ9++k91twH2vMAGP
+  KjjxxRGlnQ== )</code></td>
+</tr>
+<tr class="L0" style="">
+<td><img style="width:1em;" src="/green.png"  /></td>
+<td>RRSIG<span class="keytag">=1363</span> and DNSKEY<span class="keytag">=1363/SEP</span> verifies the A RRset</td>
+</tr>
+</TABLE>
+</TD>
+</TR>
+</table><p>Move your mouse over any <img src="/red.png" style="width:1em;" /> or <img src="/yellow.png" style="width:1em;" /> symbols for remediation hints.</p><p>Want a second opinion? Test stalkr.net at <a href="http://dnsviz.net/d/stalkr.net/dnssec/">dnsviz.net</a>.</p><table class="tlr" width="100%"><tr><td style="text-align:left; width:30em;"></td> <td style="text-align:center; width:15em;"></td> <td style="text-align:right; width:30em;">DNSSEC Analyzer</td></tr></table><p><a class="adv" href="#" onclick="javascript:toggleByClass('adv');">&darr; Advanced options</a> <a class="adv" href="#" onclick="javascript:toggleByClass('adv');" style="display:none;">&uarr; Advanced options</a></p><div class='adv' style='display:none;'><table><tr><td>Trust Anchor: </td> <td><input type="text" name="a"  onkeypress="return submitenter(this,event)" style="width:70em" /></td></tr><tr><td>Name Servers:</td> <td><input type="text" name="n"  size="40" onkeypress="return submitenter(this,event)" /></td></tr></table><p>Paste a DS or DNSKEY record into the field above to use a Trust Anchor that is not published in the DNS. Validation will begin at the owner name of the DS/DNSKEY record.</p><p>You may also supply alternative starting name servers, separated by whitespace or commas. The given name servers must be authoritative for the same zone as the Trust Anchor.</p></div>  <div class="footer">
+  <div class="links">
+  <a href="http://www.verisign.com/en_US/legal-notices/index.xhtml">Legal Notices</a>//<a href="http://www.verisign.com/en_US/privacy/index.xhtml">Privacy</a>//<a href="http://www.verisign.com/en_US/verisign-repository/index.xhtml">Repository</a>//<a href="http://www.verisign.com/en_US/contact-us/index.xhtml">Contact Us</a>//<a href="http://www.verisign.com/en_US/site-map/index.xhtml">Site Map</a>
+  </div>
+  <br><br>
+  &copy; 2011-2018
+  VeriSign, Inc. All rights reserved.<br>VERISIGN, the VERISIGN logo, and other trademarks, service marks, and designs are registered or unregistered trademarks of VeriSign, Inc. and its subsidiaries in the United States and in foreign countries. All other trademarks are property of their respective owners.
+  </div>
+</form>

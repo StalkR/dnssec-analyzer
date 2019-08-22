@@ -103,8 +103,9 @@ func monitor(domain string) {
 	}
 }
 
-func email(domain, state, body string) error {
+func email(domain, state, details string) error {
 	subject := fmt.Sprintf("DNSSEC monitor for %v: %v", domain, state)
+	body := fmt.Sprintf("%s%s\n%s", dnssec.URL, domain, details)
 	return mail(*flagFrom, *flagTo, subject, body)
 }
 

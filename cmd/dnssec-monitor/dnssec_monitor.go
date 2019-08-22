@@ -28,8 +28,9 @@ func main() {
 		os.Exit(1)
 	}
 	for _, domain := range domains {
-		monitor(domain)
+		go monitor(domain)
 	}
+	select {}
 }
 
 func monitor(domain string) {

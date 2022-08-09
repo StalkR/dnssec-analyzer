@@ -1,6 +1,6 @@
 # DNSSEC analyzer
 
-[![Build Status](https://api.travis-ci.org/StalkR/dnssec-analyzer.png?branch=master)](https://travis-ci.org/StalkR/dnssec-analyzer) [![Godoc](https://godoc.org/github.com/StalkR/dnssec-analyzer?status.png)](https://godoc.org/github.com/StalkR/dnssec-analyzer)
+[![Build Status](https://github.com/StalkR/dnssec-analyzer/actions/workflows/build.yml/badge.svg)](https://github.com/StalkR/dnssec-analyzer/actions/workflows/build.yml) [![Godoc](https://godoc.org/github.com/StalkR/dnssec-analyzer?status.png)](https://godoc.org/github.com/StalkR/dnssec-analyzer)
 
 A Go library and command-line tools to use Verisign Labs DNSSEC analyzer:
 https://dnssec-analyzer.verisignlabs.com

@@ -56,9 +56,12 @@ or warnings 3 times in a row:
     $ ./dnssec-monitor -domains stalkr.net -from <email> -to <email> -every 24h
     ...
 
-Alternatively, create the Debian package and install it:
+# Debian package
 
-    $ cd $GOPATH/src/github.com/StalkR/dnssec-analyzer/cmd/dnssec-monitor
+Both tools are available as a Debian package named `dnssec-monitor`:
+
+    $ git clone https://github.com/StalkR/dnssec-analyzer
+    $ cd dnssec-analyzer
     $ fakeroot debian/rules clean binary
     $ sudo dpkg -i ../dnssec-monitor_1-1_amd64.deb
 
